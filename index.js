@@ -109,3 +109,16 @@ app.get('/api/users', async (req, res) => {
       res.status(500).json({ error: error.message });
   }
 });
+
+// 5. DELETE USER
+app.delete('/api/users/:id', async (req, res) => {
+  try {
+      const userId = req.params.id;
+      const connection = await pool.getConnection();
+      await connection.query('DELETE FROM users WHERE id = ?', [userId]);
+      connection.release();
+      res.json({ success: true });
+  } catch (error) {
+      res.status(500).json({ error: error.message });
+  }
+});
