@@ -122,3 +122,47 @@ app.delete('/api/users/:id', async (req, res) => {
       res.status(500).json({ error: error.message });
   }
 });
+
+// 6. RE-GENERATE KEY
+app.post('/api/regenerate', async (req, res) => {
+  let connection;
+  try {
+      const { userId } = req.body;
+      connection = await pool.getConnection();
+      
+      // Get old key ID
+      const [user] = await connection.query('SELECT api_key_id FROM users WHERE id = ?', [userId]);
+      if (user.length === 0) return res.status(404).json({ message: 'User not found' });
+      
+      const oldKeyId = user[0].api_key_id;
+
+      // Mark old key as out_of_date
+      if (oldKeyId) {
+          await connection.query('UPDATE api_keys SET out_of_date = TRUE, is_active = FALSE WHERE id = ?', [oldKeyId]);
+      }
+
+      // Create NEW Key
+      const timestamp = Date.now();
+      const random = crypto.randomBytes(16).toString('hex');
+      const newApiKey = `sk-umy-${timestamp}-${random}`;
+
+      const [keyResult] = await connection.query(
+          'INSERT INTO api_keys (api_key, is_active, out_of_date) VALUES (?, ?, ?)',
+          [newApiKey, true, false]
+      );
+
+      // Update User
+      await connection.query('UPDATE users SET api_key_id = ? WHERE id = ?', [keyResult.insertId, userId]);
+
+      res.json({ success: true, newApiKey });
+
+  } catch (error) {
+      res.status(500).json({ error: error.message });
+  } finally {
+      if (connection) connection.release();
+  }
+});
+
+app.listen(port, () => {
+  console.log(`🚀 Server running at http://localhost:${port}`);
+});
