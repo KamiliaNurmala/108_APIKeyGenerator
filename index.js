@@ -69,3 +69,26 @@ app.post('/register', async (req, res) => {
       if (connection) connection.release();
   }
 });
+
+// 3. ADMIN LOGIN (Plain Text Check)
+app.post('/admin/login', async (req, res) => {
+  try {
+      const { email, password } = req.body;
+      const connection = await pool.getConnection();
+      
+      // Simple SELECT query
+      const [rows] = await connection.query(
+          'SELECT * FROM admin WHERE email = ? AND password = ?', 
+          [email, password]
+      );
+      connection.release();
+
+      if (rows.length > 0) {
+          res.json({ success: true, message: 'Login successful' });
+      } else {
+          res.status(401).json({ success: false, message: 'Wrong email or password' });
+      }
+  } catch (error) {
+      res.status(500).json({ success: false, message: error.message });
+  }
+});
