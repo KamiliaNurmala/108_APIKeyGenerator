@@ -92,3 +92,20 @@ app.post('/admin/login', async (req, res) => {
       res.status(500).json({ success: false, message: error.message });
   }
 });
+
+// 4. DASHBOARD DATA
+app.get('/api/users', async (req, res) => {
+  try {
+      const connection = await pool.getConnection();
+      const sql = `
+          SELECT u.id, u.firstname, u.lastname, u.email, k.api_key, k.out_of_date 
+          FROM users u 
+          LEFT JOIN api_keys k ON u.api_key_id = k.id
+      `;
+      const [rows] = await connection.query(sql);
+      connection.release();
+      res.json(rows);
+  } catch (error) {
+      res.status(500).json({ error: error.message });
+  }
+});
