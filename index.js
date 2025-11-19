@@ -29,6 +29,7 @@ app.use(express.static('public'))
 // 1. Serve HTML Pages
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 app.get('/admin/login', (req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
+app.get('/admin/register', (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin_register.html'))); // <--- ADD THIS LINE
 app.get('/admin/dashboard', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
 
 // 2. USER REGISTER (Generate Key & Save User)
