@@ -24,145 +24,200 @@ app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 app.use(express.static('public'))
 
+// --- MIDDLEWARE HASHING (Custom tanpa bcrypt) ---
+// Fungsi helper untuk hash password
+const hashPassword = (password) => {
+    return crypto.createHash('sha256').update(password).digest('hex');
+};
+
+// Middleware yang otomatis men-hash password jika ada di request body
+const hashPasswordMiddleware = (req, res, next) => {
+    if (req.body.password) {
+        req.body.password = hashPassword(req.body.password);
+    }
+    next();
+};
+
 // --- ROUTES ---
 
 // 1. Serve HTML Pages
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 app.get('/admin/login', (req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
-app.get('/admin/register', (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin_register.html'))); // <--- ADD THIS LINE
+app.get('/admin/register', (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin_register.html')));
 app.get('/admin/dashboard', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
 
-// 2. USER REGISTER (Generate Key & Save User)
+// 2. USER REGISTER (Save User & Key)
 app.post('/register', async (req, res) => {
     let connection;
     try {
-        // Now we accept apiKey from body too
         const { firstname, lastname, email, apiKey } = req.body;
         
-        // If frontend didn't send key, generate one (fallback)
-        const finalApiKey = apiKey || `sk-umy-${Date.now()}-${crypto.randomBytes(16).toString('hex')}`;
-
         connection = await pool.getConnection();
+
+        // --- VALIDASI DUPLIKASI USER ---
+        // Cek apakah email sudah ada
+        const [existingEmail] = await connection.query(
+            'SELECT id FROM users WHERE email = ?', 
+            [email]
+        );
+        if (existingEmail.length > 0) {
+            connection.release();
+            return res.status(400).json({ success: false, message: 'Email sudah terdaftar!' });
+        }
+
+        // Cek apakah kombinasi Nama Depan & Nama Belakang sudah ada
+        const [existingName] = await connection.query(
+            'SELECT id FROM users WHERE firstname = ? AND lastname = ?', 
+            [firstname, lastname]
+        );
+        if (existingName.length > 0) {
+            connection.release();
+            return res.status(400).json({ success: false, message: 'Nama User (Depan & Belakang) sudah terdaftar!' });
+        }
+        // -------------------------------
+
+        // Fallback jika frontend tidak mengirim key
+        const finalApiKey = apiKey || `sk-umy-${Date.now()}-${crypto.randomBytes(8).toString('hex')}`;
+
         await connection.beginTransaction();
 
-        // A. Save API Key first
+        // Simpan API Key
         const [keyResult] = await connection.query(
             'INSERT INTO api_keys (api_key, is_active, out_of_date) VALUES (?, ?, ?)',
             [finalApiKey, true, false]
         );
         const keyId = keyResult.insertId;
 
-      // B. Save User
-      await connection.query(
-          'INSERT INTO users (firstname, lastname, email, api_key_id) VALUES (?, ?, ?, ?)',
-          [firstname, lastname, email, keyId]
-      );
+        // Simpan User
+        await connection.query(
+            'INSERT INTO users (firstname, lastname, email, api_key_id) VALUES (?, ?, ?, ?)',
+            [firstname, lastname, email, keyId]
+        );
 
-      await connection.commit();
-      res.json({ success: true, apiKey: apiKey, message: 'User registered successfully!' });
+        await connection.commit();
+        res.json({ success: true, apiKey: finalApiKey, message: 'User registered successfully!' });
 
-  } catch (error) {
-      if (connection) await connection.rollback();
-      console.error(error);
-      res.status(500).json({ success: false, message: error.message });
-  } finally {
-      if (connection) connection.release();
-  }
+    } catch (error) {
+        if (connection) await connection.rollback();
+        // Tangkap error duplicate entry database (jaga-jaga)
+        if (error.code === 'ER_DUP_ENTRY') {
+             res.status(400).json({ success: false, message: 'Data duplikat terdeteksi di database.' });
+        } else {
+             res.status(500).json({ success: false, message: error.message });
+        }
+    } finally {
+        if (connection) connection.release();
+    }
 });
 
-// 3. ADMIN LOGIN (Plain Text Check)
-app.post('/admin/login', async (req, res) => {
-  try {
-      const { email, password } = req.body;
-      const connection = await pool.getConnection();
-      
-      // Simple SELECT query
-      const [rows] = await connection.query(
-          'SELECT * FROM admin WHERE email = ? AND password = ?', 
-          [email, password]
-      );
-      connection.release();
+// 3. ADMIN REGISTER (Pakai Middleware Hash!)
+app.post('/admin/register', hashPasswordMiddleware, async (req, res) => {
+    let connection;
+    try {
+        const { email, password } = req.body;
+        
+        connection = await pool.getConnection();
 
-      if (rows.length > 0) {
-          res.json({ success: true, message: 'Login successful' });
-      } else {
-          res.status(401).json({ success: false, message: 'Wrong email or password' });
-      }
-  } catch (error) {
-      res.status(500).json({ success: false, message: error.message });
-  }
+        // --- VALIDASI DUPLIKASI ADMIN ---
+        const [existingAdmin] = await connection.query(
+            'SELECT id FROM admin WHERE email = ?', 
+            [email]
+        );
+        
+        if (existingAdmin.length > 0) {
+            connection.release();
+            return res.status(400).json({ success: false, message: 'Email Admin sudah digunakan!' });
+        }
+        // --------------------------------
+
+        await connection.query('INSERT INTO admin (email, password) VALUES (?, ?)', [email, password]);
+        connection.release(); // Jangan lupa release connection manual karena tidak pakai try-finally block yang complex di sini (atau bisa disamakan strukturnya)
+        
+        res.json({ success: true, message: 'Admin created successfully' });
+    } catch (error) {
+        if(connection) connection.release();
+        res.status(500).json({ success: false, message: error.message });
+    }
 });
 
-// 4. DASHBOARD DATA
+// 4. ADMIN LOGIN (Pakai Middleware Hash juga!)
+app.post('/admin/login', hashPasswordMiddleware, async (req, res) => {
+    try {
+        const { email, password } = req.body; // Password yang masuk sini sudah di-hash
+        const connection = await pool.getConnection();
+        
+        // Bandingkan hash di database dengan hash inputan user
+        const [rows] = await connection.query(
+            'SELECT * FROM admin WHERE email = ? AND password = ?', 
+            [email, password]
+        );
+        connection.release();
+
+        if (rows.length > 0) {
+            res.json({ success: true, message: 'Login successful' });
+        } else {
+            res.status(401).json({ success: false, message: 'Wrong email or password' });
+        }
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// 5. DASHBOARD DATA
 app.get('/api/users', async (req, res) => {
-  try {
-      const connection = await pool.getConnection();
-      const sql = `
-          SELECT u.id, u.firstname, u.lastname, u.email, k.api_key, k.out_of_date 
-          FROM users u 
-          LEFT JOIN api_keys k ON u.api_key_id = k.id
-      `;
-      const [rows] = await connection.query(sql);
-      connection.release();
-      res.json(rows);
-  } catch (error) {
-      res.status(500).json({ error: error.message });
-  }
+    try {
+        const connection = await pool.getConnection();
+        const sql = `
+            SELECT u.id, u.firstname, u.lastname, u.email, k.api_key, k.out_of_date 
+            FROM users u 
+            LEFT JOIN api_keys k ON u.api_key_id = k.id
+        `;
+        const [rows] = await connection.query(sql);
+        connection.release();
+        res.json(rows);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
 });
 
-// 5. DELETE USER
+// 6. DELETE USER (FIXED)
 app.delete('/api/users/:id', async (req, res) => {
-  try {
-      const userId = req.params.id;
-      const connection = await pool.getConnection();
-      await connection.query('DELETE FROM users WHERE id = ?', [userId]);
-      connection.release();
-      res.json({ success: true });
-  } catch (error) {
-      res.status(500).json({ error: error.message });
-  }
-});
+    let connection;
+    try {
+        const userId = req.params.id;
+        connection = await pool.getConnection();
+        await connection.beginTransaction();
 
-// 6. RE-GENERATE KEY
-app.post('/api/regenerate', async (req, res) => {
-  let connection;
-  try {
-      const { userId } = req.body;
-      connection = await pool.getConnection();
-      
-      // Get old key ID
-      const [user] = await connection.query('SELECT api_key_id FROM users WHERE id = ?', [userId]);
-      if (user.length === 0) return res.status(404).json({ message: 'User not found' });
-      
-      const oldKeyId = user[0].api_key_id;
+        // 1. Cari tahu dulu ID API Key-nya berapa
+        const [rows] = await connection.query('SELECT api_key_id FROM users WHERE id = ?', [userId]);
+        
+        if (rows.length === 0) {
+            connection.release();
+            return res.status(404).json({ success: false, message: 'User not found' });
+        }
 
-      // Mark old key as out_of_date
-      if (oldKeyId) {
-          await connection.query('UPDATE api_keys SET out_of_date = TRUE, is_active = FALSE WHERE id = ?', [oldKeyId]);
-      }
+        const apiKeyId = rows[0].api_key_id;
 
-      // Create NEW Key
-      const timestamp = Date.now();
-      const random = crypto.randomBytes(16).toString('hex');
-      const newApiKey = `sk-umy-${timestamp}-${random}`;
+        // 2. Hapus User TERLEBIH DAHULU (karena User punya FK ke API Key)
+        await connection.query('DELETE FROM users WHERE id = ?', [userId]);
 
-      const [keyResult] = await connection.query(
-          'INSERT INTO api_keys (api_key, is_active, out_of_date) VALUES (?, ?, ?)',
-          [newApiKey, true, false]
-      );
+        // 3. Hapus API Key TERAKHIR (jika ada)
+        if (apiKeyId) {
+            await connection.query('DELETE FROM api_keys WHERE id = ?', [apiKeyId]);
+        }
 
-      // Update User
-      await connection.query('UPDATE users SET api_key_id = ? WHERE id = ?', [keyResult.insertId, userId]);
+        await connection.commit();
+        res.json({ success: true, message: 'User and API Key deleted successfully' });
 
-      res.json({ success: true, newApiKey });
-
-  } catch (error) {
-      res.status(500).json({ error: error.message });
-  } finally {
-      if (connection) connection.release();
-  }
+    } catch (error) {
+        if (connection) await connection.rollback();
+        console.error('Error deleting:', error); // Tambahkan log error di terminal
+        res.status(500).json({ success: false, message: error.message });
+    } finally {
+        if (connection) connection.release();
+    }
 });
 
 app.listen(port, () => {
-  console.log(`🚀 Server running at http://localhost:${port}`);
+    console.log(`🚀 Server running at http://localhost:${port}`);
 });

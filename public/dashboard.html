@@ -2,82 +2,220 @@
 <html>
 <head>
     <title>Admin Dashboard</title>
+    <!-- Tambahkan FontAwesome untuk Ikon -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-        body { font-family: sans-serif; padding: 20px; background: #f0f2f5; }
-        h1 { margin-bottom: 30px; }
-        table { width: 100%; border-collapse: collapse; background: white; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
-        th { background-color: #eee; font-weight: bold; }
-        tr:nth-child(even) { background-color: #f9f9f9; }
-        .btn-regen { background: none; border: none; cursor: pointer; color: blue; text-decoration: underline; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            margin: 0;
+            padding: 0;
+            background: #f0f2f5; 
+        }
+
+        /* Navbar */
+        .navbar {
+            background-color: #2c3e50;
+            color: white;
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .navbar h2 { margin: 0; font-size: 1.5rem; }
+        .btn-logout {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            text-decoration: none;
+            font-weight: bold;
+            transition: 0.3s;
+        }
+        .btn-logout:hover { background: #c0392b; }
+
+        /* Container Utama */
+        .container { padding: 30px; max-width: 1200px; margin: 0 auto; }
+
+        /* Card Container untuk Tabel */
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            overflow-x: auto; /* Biar bisa scroll kalau layar kecil */
+        }
+
+        /* Header Tabel */
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .card-header h3 { margin: 0; color: #333; }
         
-        /* Status styles */
-        .status-aktif { color: green; }
-        .status-out { color: red; }
+        /* Tabel Styling */
+        table { width: 100%; border-collapse: collapse; }
+        th, td { 
+            padding: 15px; 
+            text-align: left; 
+            border-bottom: 1px solid #eee; 
+        }
+        th { 
+            background-color: #f8f9fa; 
+            color: #555; 
+            font-weight: 600; 
+            text-transform: uppercase;
+            font-size: 0.85rem;
+        }
+        tr:hover { background-color: #f1f1f1; transition: 0.2s; }
+
+        /* API Key Styling */
+        .api-key-box {
+            font-family: 'Courier New', monospace;
+            background: #f4f4f4;
+            padding: 5px 10px;
+            border-radius: 4px;
+            color: #d63384;
+            font-size: 0.9rem;
+            border: 1px solid #ddd;
+        }
+
+        /* Status Badges */
+        .badge {
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+        .badge-active { background-color: #d4edda; color: #155724; }
+        .badge-out { background-color: #f8d7da; color: #721c24; }
+
+        /* Tombol Aksi */
+        .btn-delete { 
+            background: #fff; 
+            color: #e74c3c; 
+            border: 1px solid #e74c3c; 
+            padding: 6px 12px; 
+            border-radius: 5px; 
+            cursor: pointer; 
+            transition: 0.3s;
+        }
+        .btn-delete:hover { 
+            background: #e74c3c; 
+            color: white; 
+        }
     </style>
 </head>
 <body>
-    <h1>Dashboard Admin: Daftar User & API Key</h1>
-    <div id="table-container">Loading...</div>
+
+    <!-- Navbar -->
+    <div class="navbar">
+        <h2><i class="fas fa-key"></i> Admin Dashboard</h2>
+        <a href="/admin/login" class="btn-logout"><i class="fas fa-sign-out-alt"></i> Logout</a>
+    </div>
+
+    <div class="container">
+        <!-- Card Tabel -->
+        <div class="card">
+            <div class="card-header">
+                <h3>Daftar User & API Key</h3>
+                <button onclick="loadData()" style="background:none; border:none; cursor:pointer; color:#3498db;">
+                    <i class="fas fa-sync-alt"></i> Refresh
+                </button>
+            </div>
+            
+            <div id="table-container">Loading data...</div>
+        </div>
+    </div>
 
     <script>
         async function loadData() {
-            const res = await fetch('/api/users');
-            const users = await res.json();
+            document.getElementById('table-container').innerHTML = '<p style="text-align:center; color:#777;">Mengambil data...</p>';
             
-            let html = `
-                <table>
-                    <thead>
-                        <tr>
-                            <th>ID User</th>
-                            <th>Nama Depan</th>
-                            <th>Nama Belakang</th>
-                            <th>Email</th>
-                            <th>API Key</th>
-                            <th>Status Key</th>
-                            <th>Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-            `;
-
-            users.forEach(user => {
-                const statusText = user.out_of_date ? 'Out of Date' : 'Aktif';
-                const statusClass = user.out_of_date ? 'status-out' : 'status-aktif';
+            try {
+                const res = await fetch('/api/users');
+                const users = await res.json();
                 
-                html += `
-                    <tr>
-                        <td>${user.id}</td>
-                        <td>${user.firstname}</td>
-                        <td>${user.lastname}</td>
-                        <td>${user.email}</td>
-                        <td style="font-family:monospace; color: #555;">${user.api_key || 'No Key'}</td>
-                        <td class="${statusClass}">${statusText}</td>
-                        <td>
-                            <button class="btn-regen" onclick="regenerateKey(${user.id})">Generate New Key</button>
-                        </td>
-                    </tr>
+                if(users.length === 0) {
+                    document.getElementById('table-container').innerHTML = '<p style="text-align:center; padding:20px;">Belum ada user yang terdaftar.</p>';
+                    return;
+                }
+
+                let html = `
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>User Info</th>
+                                <th>Email</th>
+                                <th>API Key</th>
+                                <th>Status</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
                 `;
-            });
 
-            html += '</tbody></table>';
-            document.getElementById('table-container').innerHTML = html;
-        }
+                users.forEach(user => {
+                    const statusText = user.out_of_date ? 'Out of Date' : 'Active';
+                    const statusClass = user.out_of_date ? 'badge-out' : 'badge-active';
+                    const iconClass = user.out_of_date ? 'fa-times-circle' : 'fa-check-circle';
+                    
+                    html += `
+                        <tr>
+                            <td>#${user.id}</td>
+                            <td>
+                                <strong>${user.firstname} ${user.lastname}</strong>
+                            </td>
+                            <td>${user.email}</td>
+                            <td>
+                                <span class="api-key-box">${user.api_key || 'No Key'}</span>
+                            </td>
+                            <td>
+                                <span class="badge ${statusClass}">
+                                    <i class="fas ${iconClass}"></i> ${statusText}
+                                </span>
+                            </td>
+                            <td>
+                                <button class="btn-delete" onclick="deleteUser(${user.id})">
+                                    <i class="fas fa-trash-alt"></i> Delete
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                });
 
-        async function regenerateKey(userId) {
-            if(!confirm("Generate key baru untuk user ini?")) return;
-            
-            const res = await fetch('/api/regenerate', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId })
-            });
-            const data = await res.json();
-            if(data.success) {
-                loadData();
+                html += '</tbody></table>';
+                document.getElementById('table-container').innerHTML = html;
+
+            } catch (err) {
+                document.getElementById('table-container').innerHTML = '<p style="color:red; text-align:center;">Gagal memuat data.</p>';
             }
         }
 
+        async function deleteUser(userId) {
+            if(!confirm("Yakin ingin menghapus user ini permanen?")) return;
+            
+            try {
+                const res = await fetch(`/api/users/${userId}`, { method: 'DELETE' });
+                const data = await res.json();
+                
+                if(data.success) {
+                    // alert('Berhasil dihapus!'); // Opsional, bisa dihilangkan biar lebih cepat
+                    loadData(); 
+                } else {
+                    alert('Gagal: ' + data.message);
+                }
+            } catch (err) {
+                alert('Error koneksi');
+            }
+        }
+
+        // Load data saat halaman dibuka
         loadData();
     </script>
 </body>
