@@ -3,19 +3,30 @@
 <head>
     <title>Admin Login</title>
     <style>
-        body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background: #2c3e50; }
-        .card { background: white; padding: 40px; border-radius: 10px; width: 300px; text-align: center; }
-        input { width: 100%; padding: 10px; margin: 10px 0; box-sizing: border-box; }
-        button { width: 100%; padding: 10px; background: #e74c3c; color: white; border: none; cursor: pointer; }
+        body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background: #f0f2f5; }
+        .card { background: white; padding: 40px; border-radius: 10px; width: 400px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        h2 { margin-top: 0; }
+        input { width: 100%; padding: 10px; margin: 10px 0; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
+        button { padding: 10px 20px; background: #ddd; border: 1px solid #ccc; cursor: pointer; border-radius: 4px; }
+        button:hover { background: #ccc; }
+        a { display: block; margin-top: 20px; color: purple; text-decoration: none; }
     </style>
 </head>
 <body>
     <div class="card">
         <h2>Admin Login</h2>
-        <input type="email" id="email" placeholder="Email">
-        <input type="password" id="password" placeholder="Password">
+        
+        <label>Email:</label>
+        <input type="email" id="email" value="user2@gmail.com">
+        
+        <label>Password:</label>
+        <input type="password" id="password">
+        
         <button onclick="login()">Login</button>
-        <p id="msg" style="color: red;"></p>
+        
+        <div id="msg" style="margin-top: 10px;"></div>
+
+        <a href="/admin/register">Belum punya akun? Register di sini</a>
     </div>
 
     <script>
@@ -31,9 +42,11 @@
 
             const data = await res.json();
             if (data.success) {
-                window.location.href = '/admin/dashboard';
+                document.getElementById('msg').innerText = 'Login successful';
+                setTimeout(() => { window.location.href = '/admin/dashboard'; }, 1000);
             } else {
                 document.getElementById('msg').innerText = data.message;
+                document.getElementById('msg').style.color = 'red';
             }
         }
     </script>

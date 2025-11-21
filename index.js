@@ -34,24 +34,23 @@ app.get('/admin/dashboard', (req, res) => res.sendFile(path.join(__dirname, 'pub
 
 // 2. USER REGISTER (Generate Key & Save User)
 app.post('/register', async (req, res) => {
-  let connection;
-  try {
-      const { firstname, lastname, email } = req.body;
-      
-      // Generate API Key
-      const timestamp = Date.now();
-      const random = crypto.randomBytes(16).toString('hex');
-      const apiKey = `sk-umy-${timestamp}-${random}`;
+    let connection;
+    try {
+        // Now we accept apiKey from body too
+        const { firstname, lastname, email, apiKey } = req.body;
+        
+        // If frontend didn't send key, generate one (fallback)
+        const finalApiKey = apiKey || `sk-umy-${Date.now()}-${crypto.randomBytes(16).toString('hex')}`;
 
-      connection = await pool.getConnection();
-      await connection.beginTransaction();
+        connection = await pool.getConnection();
+        await connection.beginTransaction();
 
-      // A. Save API Key first
-      const [keyResult] = await connection.query(
-          'INSERT INTO api_keys (api_key, is_active, out_of_date) VALUES (?, ?, ?)',
-          [apiKey, true, false]
-      );
-      const keyId = keyResult.insertId;
+        // A. Save API Key first
+        const [keyResult] = await connection.query(
+            'INSERT INTO api_keys (api_key, is_active, out_of_date) VALUES (?, ?, ?)',
+            [finalApiKey, true, false]
+        );
+        const keyId = keyResult.insertId;
 
       // B. Save User
       await connection.query(

@@ -1,49 +1,95 @@
 <!DOCTYPE html>
-<html lang="id">
-    <head>
-        <title>User Registration</title>
-        <style>
-            body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background: #f0f2f5; }
-            .card { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 350px; }
-            input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
-            button { width: 100%; padding: 10px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
-            button:hover { background: #0056b3; }
-            .result { margin-top: 20px; padding: 10px; background: #e8f5e9; border: 1px solid #c8e6c9; border-radius: 5px; display: none; word-break: break-all; }
-        </style>
-    </head>
-    <body>
-        <div class="card">
-            <h2>Get API Key</h2>
-            <input type="text" id="firstname" placeholder="First Name">
-            <input type="text" id="lastname" placeholder="Last Name">
-            <input type="email" id="email" placeholder="Email Address">
-            <button onclick="registerUser()">Generate API Key</button>
-            
-            <div id="result" class="result"></div>
-            <p style="text-align:center; margin-top:15px;"><a href="/admin/login">Admin Login</a></p>
+<html>
+<head>
+    <title>Daftar User & Generate API Key</title>
+    <style>
+        body { font-family: sans-serif; padding: 40px; background: #f0f2f5; }
+        .container { background: white; padding: 40px; border-radius: 5px; max-width: 800px; margin: 0 auto; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        h2 { margin-top: 0; margin-bottom: 30px; }
+        
+        .form-group { display: flex; margin-bottom: 15px; align-items: center; }
+        .form-group label { width: 150px; }
+        .form-group input { flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px; max-width: 300px; }
+        
+        .api-box { flex: 1; padding: 8px; border: 1px solid #333; background: #f9f9f9; max-width: 400px; min-height: 20px; font-family: monospace; }
+        
+        .btn { padding: 10px 20px; border: 1px solid #ccc; background: #eee; cursor: pointer; border-radius: 4px; margin-top: 10px; }
+        .btn:hover { background: #ddd; }
+        .btn-save { margin-top: 20px; width: 100%; max-width: 300px; }
+        
+        .success-msg { color: green; margin-top: 20px; display: none; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Daftar User & Generate API Key</h2>
+        
+        <div class="form-group">
+            <label>Nama Depan:</label>
+            <input type="text" id="firstname" value="Rangga">
         </div>
-    
-        <script>
-            async function registerUser() {
-                const firstname = document.getElementById('firstname').value;
-                const lastname = document.getElementById('lastname').value;
-                const email = document.getElementById('email').value;
-    
-                const res = await fetch('/register', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ firstname, lastname, email })
-                });
-    
-                const data = await res.json();
-                if (data.success) {
-                    const resultDiv = document.getElementById('result');
-                    resultDiv.style.display = 'block';
-                    resultDiv.innerHTML = `<strong>Success!</strong><br>Your API Key:<br>${data.apiKey}`;
-                } else {
-                    alert('Error: ' + data.message);
-                }
+        
+        <div class="form-group">
+            <label>Nama Belakang:</label>
+            <input type="text" id="lastname" value="fnsvsdn">
+        </div>
+        
+        <div class="form-group">
+            <label>Email:</label>
+            <input type="email" id="email" value="user3@gmail.com">
+        </div>
+        
+        <hr style="margin: 30px 0; border: 0; border-top: 1px solid #ddd;">
+        
+        <div class="form-group">
+            <label>API Key Anda:</label>
+            <div id="apiKeyDisplay" class="api-box"></div>
+        </div>
+        
+        <button class="btn" onclick="generateTempKey()">Generate Key</button>
+        <br>
+        <button class="btn btn-save" onclick="saveUser()">Simpan Data User dan API Key</button>
+        
+        <div id="successMsg" class="success-msg">
+            User dan API key berhasil dibuat! Silakan simpan API Key Anda, karena tidak akan ditampilkan lagi.
+        </div>
+    </div>
+
+    <script>
+        let generatedKey = '';
+
+        function generateTempKey() {
+            // Just generate a random string for display (actual save happens later)
+            const timestamp = Date.now();
+            const random = Math.random().toString(36).substring(2, 15);
+            generatedKey = `sk-umy-${timestamp}-${random}`;
+            document.getElementById('apiKeyDisplay').innerText = generatedKey;
+        }
+
+        async function saveUser() {
+            if (!generatedKey) {
+                alert('Please generate key first!');
+                return;
             }
-        </script>
-    </body>
-    </html>
+
+            const firstname = document.getElementById('firstname').value;
+            const lastname = document.getElementById('lastname').value;
+            const email = document.getElementById('email').value;
+
+            // Send to backend
+            const res = await fetch('/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ firstname, lastname, email, apiKey: generatedKey }) // Send the key we generated
+            });
+
+            const data = await res.json();
+            if (data.success) {
+                document.getElementById('successMsg').style.display = 'block';
+            } else {
+                alert('Error: ' + data.message);
+            }
+        }
+    </script>
+</body>
+</html>

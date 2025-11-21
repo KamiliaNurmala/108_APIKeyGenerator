@@ -3,18 +3,21 @@
 <head>
     <title>Admin Dashboard</title>
     <style>
-        body { font-family: sans-serif; padding: 20px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        body { font-family: sans-serif; padding: 20px; background: #f0f2f5; }
+        h1 { margin-bottom: 30px; }
+        table { width: 100%; border-collapse: collapse; background: white; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
         th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
-        th { background-color: #f2f2f2; }
-        .btn-del { background: #ff4444; color: white; border: none; padding: 5px 10px; cursor: pointer; }
-        .btn-regen { background: #00C851; color: white; border: none; padding: 5px 10px; cursor: pointer; }
-        .status-active { color: green; font-weight: bold; }
-        .status-out { color: red; font-weight: bold; }
+        th { background-color: #eee; font-weight: bold; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+        .btn-regen { background: none; border: none; cursor: pointer; color: blue; text-decoration: underline; }
+        
+        /* Status styles */
+        .status-aktif { color: green; }
+        .status-out { color: red; }
     </style>
 </head>
 <body>
-    <h1>Dashboard Admin</h1>
+    <h1>Dashboard Admin: Daftar User & API Key</h1>
     <div id="table-container">Loading...</div>
 
     <script>
@@ -27,30 +30,31 @@
                     <thead>
                         <tr>
                             <th>ID User</th>
-                            <th>First Name</th>
-                            <th>Last Name</th>
+                            <th>Nama Depan</th>
+                            <th>Nama Belakang</th>
                             <th>Email</th>
                             <th>API Key</th>
-                            <th>Status</th>
-                            <th>Actions</th>
+                            <th>Status Key</th>
+                            <th>Action</th>
                         </tr>
                     </thead>
                     <tbody>
             `;
 
             users.forEach(user => {
-                const status = user.out_of_date ? '<span class="status-out">Out of Date</span>' : '<span class="status-active">Active</span>';
+                const statusText = user.out_of_date ? 'Out of Date' : 'Aktif';
+                const statusClass = user.out_of_date ? 'status-out' : 'status-aktif';
+                
                 html += `
                     <tr>
                         <td>${user.id}</td>
                         <td>${user.firstname}</td>
                         <td>${user.lastname}</td>
                         <td>${user.email}</td>
-                        <td style="font-family:monospace">${user.api_key || 'No Key'}</td>
-                        <td>${status}</td>
+                        <td style="font-family:monospace; color: #555;">${user.api_key || 'No Key'}</td>
+                        <td class="${statusClass}">${statusText}</td>
                         <td>
-                            <button class="btn-regen" onclick="regenerateKey(${user.id})">🔄 New Key</button>
-                            <button class="btn-del" onclick="deleteUser(${user.id})">🗑️ Delete</button>
+                            <button class="btn-regen" onclick="regenerateKey(${user.id})">Generate New Key</button>
                         </td>
                     </tr>
                 `;
@@ -60,14 +64,9 @@
             document.getElementById('table-container').innerHTML = html;
         }
 
-        async function deleteUser(id) {
-            if(confirm('Are you sure?')) {
-                await fetch(`/api/users/${id}`, { method: 'DELETE' });
-                loadData();
-            }
-        }
-
         async function regenerateKey(userId) {
+            if(!confirm("Generate key baru untuk user ini?")) return;
+            
             const res = await fetch('/api/regenerate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -75,7 +74,6 @@
             });
             const data = await res.json();
             if(data.success) {
-                alert('New Key Generated: ' + data.newApiKey);
                 loadData();
             }
         }
