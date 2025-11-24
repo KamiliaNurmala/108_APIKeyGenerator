@@ -24,4 +24,4 @@
 
 ![Table admin in database](img/database-admin.png)
 
-![Table user in database](img/database-user.png)
+![Table user in database](img/database-users.png)
