@@ -19,3 +19,9 @@
 ![Get All Users](img/get-all-users-postman.png)
 
 ![Delete User](img/delete-user-postman.png)
+
+# Database
+
+![Table admin in database](img/database-admin.png)
+
+![Table user in database](img/database-user.png)
