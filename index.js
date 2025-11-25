@@ -188,9 +188,10 @@ app.delete('/api/users/:id', async (req, res) => {
         connection = await pool.getConnection();
         await connection.beginTransaction();
 
-        // 1. Cari tahu dulu ID API Key-nya berapa
-        const [rows] = await connection.query('SELECT api_key_id FROM users WHERE id = ?', [userId]);
-        
+        const [rows] = await connection.query(
+            'SELECT api_key_id FROM users WHERE id = ?',
+            [userId]
+        );
         if (rows.length === 0) {
             connection.release();
             return res.status(404).json({ success: false, message: 'User not found' });
@@ -198,20 +199,19 @@ app.delete('/api/users/:id', async (req, res) => {
 
         const apiKeyId = rows[0].api_key_id;
 
-        // 2. Hapus User TERLEBIH DAHULU (karena User punya FK ke API Key)
-        await connection.query('DELETE FROM users WHERE id = ?', [userId]);
-
-        // 3. Hapus API Key TERAKHIR (jika ada)
         if (apiKeyId) {
-            await connection.query('DELETE FROM api_keys WHERE id = ?', [apiKeyId]);
+            await connection.query(
+                'UPDATE api_keys SET is_active = 0, out_of_date = 1 WHERE id = ?',
+                [apiKeyId]
+            );
         }
 
-        await connection.commit();
-        res.json({ success: true, message: 'User and API Key deleted successfully' });
+        await connection.query('DELETE FROM users WHERE id = ?', [userId]);
 
+        await connection.commit();
+        res.json({ success: true, message: 'User deleted, API key ditandai out_of_date' });
     } catch (error) {
         if (connection) await connection.rollback();
-        console.error('Error deleting:', error); // Tambahkan log error di terminal
         res.status(500).json({ success: false, message: error.message });
     } finally {
         if (connection) connection.release();
